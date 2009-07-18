@@ -1,0 +1,17 @@
+Ethernet over IPv4 tunneling driver for Linux:
+=====================================================================
+
+This is the current release of the Ethernet over IPv4 tunneling driver
+(etherip) for Linux. This driver could be used together with the
+bridging code in Linux to build distributed layer 2 Ethernet networks.
+It uses the EtherIP Protocol defined in RFC 3378.
+
+The driver compiles on kernel versions s 2.6.16 and up (tested up to 2.6.21).
+It does not compile against 2.6.15. To compile the module just type 'make'. You
+will get a module called etherip.ko which you can load with insmod into your
+running kernel and an ethiptunnel binary. The last one is the userspace setup
+tool for your EtherIP tunnels. Invoke this program with the -h option to get a
+list of command line arguments or have a look into reload.sh (a script I used
+for testing) for an example usage.
+
+Send bug reports and patches to <joerg@zlug.org>
