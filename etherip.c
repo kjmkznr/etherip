@@ -51,7 +51,7 @@ MODULE_DESCRIPTION("Ethernet over IPv4 tunnel driver");
 #define HASH_SIZE        16
 #define HASH(addr)       ((addr^(addr>>4))&0xF)
 
-#define ETHERIP_HEADER   ((u16)0x0300)
+#define ETHERIP_HEADER   ((u16)0x3000)
 #define ETHERIP_HLEN     2
 
 #define BANNER1 "etherip: Ethernet over IPv4 tunneling driver\n"
