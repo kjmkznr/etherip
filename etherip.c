@@ -368,13 +368,13 @@ add_err:
 		if (!capable(CAP_NET_ADMIN))
 			goto out;
 
-		err = -EFAULT;
-		if (copy_from_user(&p, ifr->ifr_ifru.ifru_data,
-					sizeof(p)))
-			goto out;
-
-		err = -EINVAL;
 		if (dev == etherip_tunnel_dev) {
+			err = -EFAULT;
+			if (copy_from_user(&p, ifr->ifr_ifru.ifru_data,
+						sizeof(p)))
+				goto out;
+
+			err = -EINVAL;
 			t = etherip_tunnel_find(&p);
 			if (t == NULL) {
 				goto out;
