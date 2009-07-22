@@ -44,6 +44,9 @@ MODULE_DESCRIPTION("Ethernet over IPv4 tunnel driver");
 #define IPPROTO_ETHERIP 97
 #endif
 
+#ifndef ARPHRD_ETHERIP
+#define ARPHRD_ETHERIP 0xEEE
+#endif
 /*
  * These 2 defines are taken from ipip.c - if it's good enough for them
  * it's good enough for me.
@@ -414,6 +417,7 @@ static void etherip_tunnel_setup(struct net_device *dev)
 	dev->netdev_ops      = &etherip_netdev_ops;
 	dev->destructor      = free_netdev;
 	dev->tx_queue_len    = 0;
+	dev->type            = ARPHRD_ETHERIP;
 	random_ether_addr(dev->dev_addr);
 }
 
