@@ -202,8 +202,8 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb->dst->ops->update_pmtu(skb->dst, dev->mtu);
 	*/
 
-	dst_release(skb->dst);
-	skb->dst = &rt->u.dst;
+	skb_dst_drop(skb);
+	skb_dst_set(skb, &rt->u.dst);
 
 	/* Build the IP header for the outgoing packet
 	 *
@@ -446,8 +446,8 @@ static int etherip_rcv(struct sk_buff *skb)
 	skb_pull(skb, ETHERIP_HLEN);
 	skb->protocol = eth_type_trans(skb, tunnel->dev);
 	skb->ip_summed = CHECKSUM_UNNECESSARY;
-	dst_release(skb->dst);
-	skb->dst = NULL;
+	skb_dst_drop(skb);
+	skb_dst_set(skb, NULL);
 
 	/* do some checks */
 	if (skb->pkt_type == PACKET_HOST || skb->pkt_type == PACKET_BROADCAST)
