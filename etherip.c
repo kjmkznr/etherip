@@ -13,6 +13,8 @@
  *      version 2 (no later version) as published by the
  *      Free Software Foundation.
  *
+ * Fixes:
+ *       Kazunori Kojima  : Support kernel version 2.6.30
  */
 
 #include <linux/capability.h>                           
@@ -52,7 +54,7 @@ MODULE_DESCRIPTION("Ethernet over IPv4 tunnel driver");
  * it's good enough for me.
  */
 #define HASH_SIZE        16
-#define HASH(addr)       ((addr^(addr>>4))&0xF)
+#define HASH(addr) (((__force u32)addr^((__force u32)addr>>4))&0xF)
 
 #define ETHERIP_HEADER   ((u16)0x3000)
 #define ETHERIP_HLEN     2
@@ -177,7 +179,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 			ip_rt_put(rt);
 			dev_kfree_skb(skb);
 			stats->tx_dropped++;
-			return 0;
+			return NETDEV_TX_OK;
 		}
 		if (skb->sk)
 			skb_set_owner_w(skn, skb->sk);
@@ -231,8 +233,10 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	IPTUNNEL_XMIT();
 	tunnel->dev->trans_start = jiffies;
 	tunnel->recursion--;
+	tunnel->stats.tx_packets++;
+	tunnel->stats.tx_bytes += skb->len;
 
-	return 0;
+	return NETDEV_TX_OK;
 
 tx_error_icmp:
 	dst_link_failure(skb);
@@ -241,7 +245,7 @@ tx_error:
 	stats->tx_errors++;
 	dev_kfree_skb(skb);
 	tunnel->recursion--;
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 /* get statistics callback */
