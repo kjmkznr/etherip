@@ -136,6 +136,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct etherip_tunnel *tunnel = netdev_priv(dev);
 	struct net_device_stats *stats = &tunnel->dev->stats;
+	struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
 	struct iphdr *tiph = &tunnel->parms.iph;
 	struct rtable *rt;	/* Route to the other host */
 	struct flowi fl;
@@ -447,7 +448,6 @@ static int etherip_rcv(struct sk_buff *skb)
 			sizeof(struct iphdr)+ETHERIP_HLEN);
 	skb->dev = dev;
 	skb->pkt_type = PACKET_HOST;
-	skb_pull(skb, ETHERIP_HLEN);
 	skb->protocol = eth_type_trans(skb, tunnel->dev);
 	skb->ip_summed = CHECKSUM_UNNECESSARY;
 	skb_dst_drop(skb);
