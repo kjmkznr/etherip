@@ -135,7 +135,7 @@ static int etherip_tunnel_stop(struct net_device *dev)
 static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct etherip_tunnel *tunnel = netdev_priv(dev);
-	struct net_device_stats *stats = &tunnel->dev->stats;
+	struct net_device_stats *stats = &dev->stats;
 	struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
 	struct iphdr *tiph = &tunnel->parms.iph;
 	struct rtable *rt;	/* Route to the other host */
@@ -179,7 +179,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (!skn) {
 			ip_rt_put(rt);
 			dev_kfree_skb(skb);
-			stats->tx_dropped++;
+			txq->tx_dropped++;
 			return NETDEV_TX_OK;
 		}
 		if (skb->sk)
@@ -188,7 +188,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb = skn;
 	}
 
-	skb->transport_header = skb->mac_header;
+	skb_reset_transport_header(skb);
 	skb_push(skb, sizeof(struct iphdr)+ETHERIP_HLEN);
 	skb_reset_network_header(skb);
 	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
@@ -234,8 +234,6 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	IPTUNNEL_XMIT();
 	tunnel->dev->trans_start = jiffies;
 	tunnel->recursion--;
-	tunnel->stats.tx_packets++;
-	tunnel->stats.tx_bytes += skb->len;
 
 	return NETDEV_TX_OK;
 
@@ -247,13 +245,6 @@ tx_error:
 	dev_kfree_skb(skb);
 	tunnel->recursion--;
 	return NETDEV_TX_OK;
-}
-
-/* get statistics callback */
-static struct net_device_stats *etherip_tunnel_stats(struct net_device *dev)
-{
-	struct etherip_tunnel *ethip = netdev_priv(dev);
-	return &ethip->stats;
 }
 
 /* checks parameters the driver gets from userspace */
@@ -410,7 +401,6 @@ static const struct net_device_ops etherip_netdev_ops = {
 	.ndo_stop	= etherip_tunnel_stop,
 	.ndo_start_xmit	= etherip_tunnel_xmit,
 	.ndo_do_ioctl	= etherip_tunnel_ioctl,
-	.ndo_get_stats	= etherip_tunnel_stats,
 };
 
 /* device init function - called via register_netdevice
@@ -471,8 +461,8 @@ drop:
 
 accept:
 	tunnel->dev->last_rx = jiffies;
-	tunnel->stats.rx_packets++;
-	tunnel->stats.rx_bytes += skb->len;
+	tunnel->dev->stats.rx_packets++;
+	tunnel->dev->stats.rx_bytes += skb->len;
 	nf_reset(skb);
 	netif_rx(skb);
 	read_unlock_bh(&etherip_lock);
