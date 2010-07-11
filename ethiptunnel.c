@@ -62,7 +62,7 @@ int do_tunnel_add(char *devname, __u32 daddr, __u32 saddr, int ttl)
 	struct ip_tunnel_parm p;
 
 	strncpy(ifr.ifr_name, "ethip0", IFNAMSIZ);
-	ifr.ifr_ifru.ifru_data = &p;
+	ifr.ifr_ifru.ifru_data = (void *)&p;
 	p.iph.ttl = 0;
 	__init_tunnel_params(&p, devname, daddr, saddr, 1, ttl);
 
@@ -77,7 +77,7 @@ int do_tunnel_change (char *devname, __u32 daddr, __u32 saddr, int set_saddr, in
 
 	strncpy(ifr.ifr_name, devname, IFNAMSIZ);
 	p.name[IFNAMSIZ-1] = 0;
-	ifr.ifr_ifru.ifru_data = &p;
+	ifr.ifr_ifru.ifru_data = (void *)&p;
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd == -1) {
 		perror("socket");
@@ -112,7 +112,8 @@ int do_tunnel_list()
 	struct ifreq ifr;
 	struct ip_tunnel_parm p;
 	struct in_addr daddr_s;
-	char ttl_str[7], saddr_str[16];
+	char ttl_str[8], saddr_str[16];
+	char *result;
 	
 	sd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sd == -1) {
@@ -127,8 +128,8 @@ int do_tunnel_list()
 	}
 
 	/* skip first 2 lines */
-	fgets(line, 2048, fd);
-	fgets(line, 2048, fd);
+	result = fgets(line, 2048, fd);
+	result = fgets(line, 2048, fd);
 
 	while (fgets(line, 2048, fd)) {
 		for (i=0;line[i] == ' ';++i);
@@ -139,7 +140,7 @@ int do_tunnel_list()
 		dev[j] = 0;
 		
 		strncpy(ifr.ifr_name, dev, IFNAMSIZ);
-		ifr.ifr_ifru.ifru_data = &p;
+		ifr.ifr_ifru.ifru_data = (void *)&p;
 		if (ioctl(sd, SIOCGETTUNNEL, &ifr) != 0) continue;
 		if (p.iph.protocol != IPPROTO_ETHERIP) continue;
 
