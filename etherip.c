@@ -31,6 +31,7 @@
 #include <linux/list.h>
 #include <linux/string.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/if_arp.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/route.h>
@@ -46,9 +47,6 @@ MODULE_DESCRIPTION("Ethernet over IPv4 tunnel driver");
 #define IPPROTO_ETHERIP 97
 #endif
 
-#ifndef ARPHRD_ETHERIP
-#define ARPHRD_ETHERIP 0xEEE
-#endif
 /*
  * These 2 defines are taken from ipip.c - if it's good enough for them
  * it's good enough for me.
@@ -136,6 +134,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct etherip_tunnel *tunnel = netdev_priv(dev);
 	struct net_device_stats *stats = &tunnel->dev->stats;
+	struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
 	struct iphdr *tiph = &tunnel->parms.iph;
 	struct rtable *rt;	/* Route to the other host */
 	struct flowi fl;
@@ -178,7 +177,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (!skn) {
 			ip_rt_put(rt);
 			dev_kfree_skb(skb);
-			stats->tx_dropped++;
+			txq->tx_dropped++;
 			return NETDEV_TX_OK;
 		}
 		if (skb->sk)
@@ -421,7 +420,7 @@ static void etherip_tunnel_setup(struct net_device *dev)
 	dev->netdev_ops      = &etherip_netdev_ops;
 	dev->destructor      = free_netdev;
 	dev->tx_queue_len    = 0;
-	dev->type            = ARPHRD_ETHERIP;
+	dev->type            = ARPHRD_ETHER;
 	random_ether_addr(dev->dev_addr);
 }
 
@@ -443,8 +442,8 @@ static int etherip_rcv(struct sk_buff *skb)
 
 	dev = tunnel->dev;
 	secpath_reset(skb);
-	skb_pull(skb, ((unsigned char*)skb->network_header-skb->data) +
-			sizeof(struct iphdr)+ETHERIP_HLEN);
+	skb->mac_header = skb->network_header;
+	skb_reset_network_header(skb);
 	skb->dev = dev;
 	skb->pkt_type = PACKET_HOST;
 	skb_pull(skb, ETHERIP_HLEN);
