@@ -457,7 +457,7 @@ static int etherip_rcv(struct sk_buff *skb)
 		goto accept;
 
 	if (skb->pkt_type == PACKET_MULTICAST &&
-			(dev->mc_count > 0 || dev->flags & IFF_ALLMULTI))
+			(netdev_mc_count(dev) > 0 || dev->flags & IFF_ALLMULTI))
 		goto accept;
 
 	if (skb->pkt_type == PACKET_OTHERHOST && dev->flags & IFF_PROMISC)
