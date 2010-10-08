@@ -14,7 +14,9 @@
  *      Free Software Foundation.
  *
  * Fixes:
- *       Kazunori Kojima  : Support kernel version 2.6.30
+ *       Kazunori Kojima  : Support kernel version 2.6.30 - 2.6.35
+ * Thanks:
+ * 	Michal Rybarik    : Adding support for changing of MAC address
  */
 
 #include <linux/capability.h>                           
@@ -267,6 +269,18 @@ static int etherip_param_check(struct ip_tunnel_parm *p)
 	return 0;
 }
 
+static int etherip_tunnel_set_mac_address(struct net_device *dev, void *p) {
+	struct sockaddr *addr = p;
+
+	if (!is_valid_ether_addr(addr->sa_data))
+		return -EADDRNOTAVAIL;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+
+	return 0;
+}
+
+
 /* central ioctl function for all netdevices this driver manages
  * it allows to create, delete, modify a tunnel and fetch tunnel
  * information */
@@ -409,6 +423,7 @@ static const struct net_device_ops etherip_netdev_ops = {
 	.ndo_start_xmit	= etherip_tunnel_xmit,
 	.ndo_do_ioctl	= etherip_tunnel_ioctl,
 	.ndo_get_stats	= etherip_tunnel_stats,
+	.ndo_set_mac_address	= etherip_tunnel_set_mac_address,
 };
 
 /* device init function - called via register_netdevice
