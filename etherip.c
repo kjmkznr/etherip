@@ -163,7 +163,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto tx_error_icmp;
 	}
 
-	tdev = rt->u.dst.dev;
+	tdev = rt->dst.dev;
 	if (tdev == dev) {
 		ip_rt_put(rt);
 		stats->collisions++;
@@ -206,7 +206,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	*/
 
 	skb_dst_drop(skb);
-	skb_dst_set(skb, &rt->u.dst);
+	skb_dst_set(skb, &rt->dst);
 
 	/* Build the IP header for the outgoing packet
 	 *
@@ -226,7 +226,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	iph->saddr = rt->rt_src;
 	iph->ttl = tunnel->parms.iph.ttl;
 	if (iph->ttl == 0)
-		iph->ttl = dst_metric(&rt->u.dst, RTAX_HOPLIMIT);
+		iph->ttl = dst_metric(&rt->dst, RTAX_HOPLIMIT);
 
 	/* add the 16bit etherip header after the ip header */
 	((u16*)(iph+1))[0]=htons(ETHERIP_HEADER);
@@ -269,9 +269,12 @@ static int etherip_param_check(struct ip_tunnel_parm *p)
 	return 0;
 }
 
-static int etherip_tunnel_set_mac_address(struct net_device *dev, void *p) {
+static int etherip_tunnel_set_mac_address(struct net_device *dev, void *p) 
+{
 	struct sockaddr *addr = p;
 
+	if (netif_running(dev))
+		return -EBUSY;
 	if (!is_valid_ether_addr(addr->sa_data))
 		return -EADDRNOTAVAIL;
 
@@ -436,6 +439,7 @@ static void etherip_tunnel_setup(struct net_device *dev)
 	dev->destructor      = free_netdev;
 	dev->tx_queue_len    = 0;
 	dev->type            = ARPHRD_ETHER;
+	dev->mtu             = ETH_DATA_LEN - dev->hard_header_len - sizeof(struct iphdr) - ETHERIP_HLEN;
 	random_ether_addr(dev->dev_addr);
 }
 
