@@ -455,6 +455,7 @@ static int etherip_rcv(struct sk_buff *skb)
 	skb_reset_network_header(skb);
 	skb->dev = dev;
 	skb->pkt_type = PACKET_HOST;
+	skb_pull(skb, ETHERIP_HLEN);
 	skb->protocol = eth_type_trans(skb, tunnel->dev);
 	skb->ip_summed = CHECKSUM_UNNECESSARY;
 	skb_dst_drop(skb);
