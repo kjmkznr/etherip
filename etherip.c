@@ -72,6 +72,14 @@ struct etherip_tunnel {
 static struct net_device *etherip_tunnel_dev;
 static struct list_head tunnels[HASH_SIZE];
 
+/* often modified stats are per cpu, other are shared (netdev->stats) */
+struct pcpu_tstats {
+	unsigned long	rx_packets;
+	unsigned long	rx_bytes;
+	unsigned long	tx_packets;
+	unsigned long	tx_bytes;
+};
+
 static DEFINE_RWLOCK(etherip_lock);
 
 static void etherip_tunnel_setup(struct net_device *dev);
@@ -135,30 +143,39 @@ static int etherip_tunnel_stop(struct net_device *dev)
 static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct etherip_tunnel *tunnel = netdev_priv(dev);
-	struct net_device_stats *stats = &dev->stats;
-	struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
+	struct pcpu_tstats *tstats;
 	struct iphdr *tiph = &tunnel->parms.iph;
+	u8     tos = tunnel->parms.iph.tos;
 	struct rtable *rt;	/* Route to the other host */
-	struct flowi fl;
+	struct flowi4 fl4;
+	const struct iphdr  *old_iph = ip_hdr(skb);
+	__be32 dst = tiph->daddr;
 	struct iphdr *iph;	/* new IP haeder */
 	struct net_device *tdev;	/* Device to other host */
 	int max_headroom;	/* The extra header space needed */
-	int err;
 
 	if (tunnel->recursion++) {
-		stats->collisions++;
+		dev->stats.collisions++;
 		goto tx_error;
 	}
 
 	/* trying to locate device to route data to */
-	memset(&fl, 0, sizeof(fl));
-	fl.oif               = 0; //tunnel->parms.link;
-	fl.proto             = IPPROTO_ETHERIP;
-	fl.nl_u.ip4_u.daddr  = tunnel->parms.iph.daddr;
-	fl.nl_u.ip4_u.saddr  = tunnel->parms.iph.saddr;
+	memset(&fl4, 0, sizeof(fl4));
+	fl4.flowi4_oif   = 0; //tunnel->parms.link;
+	fl4.flowi4_proto = IPPROTO_ETHERIP;
+	fl4.daddr        = tunnel->parms.iph.daddr;
+	fl4.saddr        = tunnel->parms.iph.saddr;
 
-	if ((err = ip_route_output_key(dev_net(tunnel->dev), &rt, &fl))) {
-		stats->tx_carrier_errors++;
+  if (tos & 1)
+    tos = old_iph->tos;
+
+  rt = ip_route_output_ports(dev_net(dev), &fl4, NULL,
+      dst, tiph->saddr,
+      0, 0,
+      IPPROTO_ETHERIP, RT_TOS(tos),
+      tunnel->parms.link);
+  if (IS_ERR(rt)) {
+		dev->stats.tx_carrier_errors++;
 		printk (KERN_INFO "etherip+: cannot find route for address 0x%x\n", tiph->daddr);
 		goto tx_error_icmp;
 	}
@@ -166,7 +183,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	tdev = rt->dst.dev;
 	if (tdev == dev) {
 		ip_rt_put(rt);
-		stats->collisions++;
+		dev->stats.collisions++;
 		goto tx_error;
 	}
 
@@ -179,7 +196,7 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (!skn) {
 			ip_rt_put(rt);
 			dev_kfree_skb(skb);
-			txq->tx_dropped++;
+			dev->stats.tx_dropped++;
 			return NETDEV_TX_OK;
 		}
 		if (skb->sk)
@@ -231,7 +248,8 @@ static int etherip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* add the 16bit etherip header after the ip header */
 	((u16*)(iph+1))[0]=htons(ETHERIP_HEADER);
 	nf_reset(skb);
-	IPTUNNEL_XMIT();
+	tstats = this_cpu_ptr(dev->tstats);
+	__IPTUNNEL_XMIT(tstats, &dev->stats);
 	tunnel->dev->trans_start = jiffies;
 	tunnel->recursion--;
 
@@ -241,7 +259,7 @@ tx_error_icmp:
 	dst_link_failure(skb);
 
 tx_error:
-	stats->tx_errors++;
+	dev->stats.tx_errors++;
 	dev_kfree_skb(skb);
 	tunnel->recursion--;
 	return NETDEV_TX_OK;
